@@ -1,5 +1,7 @@
 package flache
 
+import "time"
+
 type ringBuffer struct {
 	buf        []byte
 	freeBlocks []int
@@ -18,4 +20,28 @@ func newRingBuffer(size, blockSize int) *ringBuffer {
 		ringBuf.freeBlocks[i] = i + 1
 	}
 	return ringBuf
+}
+
+func (r *ringBuffer) readVal(index uint32) []byte {
+
+}
+
+func (r *ringBuffer) readKey(index uint32) string {
+
+}
+
+func (r *ringBuffer) readExpireAt(index uint32) time.Time {
+
+}
+
+func (r *ringBuffer) write(e entry) uint32 {
+
+}
+
+func (r *ringBuffer) remove(index uint32) {
+
+}
+
+func (r *ringBuffer) moveToHead(index uint32) {
+
 }

@@ -1,6 +1,9 @@
 package flache
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type shard struct {
 	lock    sync.Mutex
@@ -14,4 +17,72 @@ func newShard(size int) *shard {
 		ringBuf: newRingBuffer((size+defaultBlockSize-1)/defaultBlockSize*defaultBlockSize, defaultBlockSize),
 	}
 	return s
+}
+
+func (s *shard) get(key string, hashedKey uint64) ([]byte, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	index, ok := s.indices[hashedKey]
+	if !ok {
+		return nil, ErrKeyNotFount
+	}
+
+	if s.isExpire(index) {
+		s.ringBuf.remove(index)
+		delete(s.indices, hashedKey)
+		return nil, ErrKeyNotFount
+	}
+
+	cachedKey := s.ringBuf.readKey(index)
+	if key != cachedKey {
+		return nil, ErrKeyNotFount
+	}
+
+	val := s.ringBuf.readVal(index)
+	s.ringBuf.moveToHead(index)
+	return val, nil
+}
+
+func (s *shard) isExpire(index uint32) bool {
+	expireAt := s.ringBuf.readExpireAt(index)
+	if expireAt.IsZero() {
+		return false
+	}
+	return expireAt.Before(time.Now())
+}
+
+func (s *shard) set(key string, hashedKey uint64, value []byte, expiration time.Duration) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	index, ok := s.indices[hashedKey]
+	if ok {
+		s.ringBuf.remove(index)
+	}
+
+	entry := newEntry(key, hashedKey, value, expiration)
+	index = s.ringBuf.write(entry)
+	s.ringBuf.moveToHead(index)
+	s.indices[hashedKey] = index
+	return nil
+}
+
+func (s *shard) del(key string, hashedKey uint64) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	index, ok := s.indices[hashedKey]
+	if !ok {
+		return nil
+	}
+
+	cachedKey := s.ringBuf.readKey(index)
+	if key != cachedKey {
+		return nil
+	}
+
+	s.ringBuf.remove(index)
+	delete(s.indices, hashedKey)
+	return nil
 }
