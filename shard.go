@@ -25,18 +25,18 @@ func (s *shard) get(key string, hashedKey uint64) ([]byte, error) {
 
 	index, ok := s.indices[hashedKey]
 	if !ok {
-		return nil, ErrKeyNotFount
+		return nil, ErrKeyNotFound
 	}
 
 	if s.isExpire(index) {
 		s.ringBuf.remove(index)
 		delete(s.indices, hashedKey)
-		return nil, ErrKeyNotFount
+		return nil, ErrKeyNotFound
 	}
 
 	cachedKey := s.ringBuf.readKey(index)
 	if key != cachedKey {
-		return nil, ErrKeyNotFount
+		return nil, ErrKeyNotFound
 	}
 
 	val := s.ringBuf.readVal(index)
@@ -62,10 +62,24 @@ func (s *shard) set(key string, hashedKey uint64, value []byte, expiration time.
 	}
 
 	entry := newEntry(key, hashedKey, value, expiration)
+	if !s.ringBuf.hasEnoughSpace(entry) {
+		return ErrNotEnoughSpace
+	}
+
+	for !s.ringBuf.hasEnoughBlocks(entry) {
+		tail := s.ringBuf.getTail()
+		s.remove(tail)
+	}
 	index = s.ringBuf.write(entry)
-	s.ringBuf.moveToHead(index)
+	s.ringBuf.insertHead(index)
 	s.indices[hashedKey] = index
 	return nil
+}
+
+func (s *shard) remove(index uint32) {
+	hashedKey := s.ringBuf.readHashedKey(index)
+	s.ringBuf.remove(index)
+	delete(s.indices, hashedKey)
 }
 
 func (s *shard) del(key string, hashedKey uint64) error {
@@ -82,7 +96,6 @@ func (s *shard) del(key string, hashedKey uint64) error {
 		return nil
 	}
 
-	s.ringBuf.remove(index)
-	delete(s.indices, hashedKey)
+	s.remove(index)
 	return nil
 }
