@@ -88,6 +88,10 @@ func (r *ringBuffer) writePrevEntryIndex(next, prev uint32) {
 }
 
 func (r *ringBuffer) remove(index uint32) {
+	prev := r.readPrevEntryIndex(index)
+	next := r.readPrevEntryIndex(index)
+	r.link(prev, next)
+
 	r.freeBlocks = append(r.freeBlocks, int(index))
 	nextBlock := r.readNextBlockIndex(index)
 	for ; nextBlock != 0; nextBlock = r.readNextBlockIndex(index) {

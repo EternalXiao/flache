@@ -1,4 +1,4 @@
-module github.com/EternalXiao/flache
+module github.com/forevermxl/flache
 
 go 1.18
 
