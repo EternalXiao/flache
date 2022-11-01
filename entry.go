@@ -15,5 +15,8 @@ func newEntry(key string, hashedKey uint64, value []byte, expiration time.Durati
 		binary.LittleEndian.PutUint64(buf[expireAtOffset:], uint64(time.Now().Add(expiration).UnixNano()))
 	}
 	binary.LittleEndian.PutUint64(buf[hashedKeyOffset:], hashedKey)
+	keyBuf := stringToBytes(key)
+	copy(buf[entryHeaderSize:], keyBuf)
+	copy(buf[entryHeaderSize+len(key):], value)
 	return buf
 }
