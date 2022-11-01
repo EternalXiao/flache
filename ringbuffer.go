@@ -34,11 +34,50 @@ func (r *ringBuffer) readNextEntryIndex(index uint32) uint32 {
 }
 
 func (r *ringBuffer) readVal(index uint32) []byte {
+	keyLength := int(r.readKeyLength(index))
+	valLength := int(r.readValLength(index))
+	val := make([]byte, valLength)
+	valStartBlockOffset := 0
+	for i := 0; keyLength >= 0; i++ {
+		if i == 0 {
+			keyLength -= (r.blockSize - blockHeaderSize - entryHeaderSize)
+		} else {
+			keyLength -= (r.blockSize - blockHeaderSize)
+		}
+		if keyLength >= 0 {
+			index = r.readNextBlockIndex(index)
+		} else {
+			valStartBlockOffset = r.blockSize + keyLength
+		}
+	}
 
+	for i, offset := 0, 0; offset < valLength; i++ {
+		if i == 0 {
+			copy(val[offset:], r.buf[int(index)*r.blockSize+valStartBlockOffset:int(index+1)*r.blockSize])
+			offset += r.blockSize - valStartBlockOffset
+		} else {
+			copy(val[offset:], r.buf[int(index)*r.blockSize+blockHeaderSize:int(index+1)*r.blockSize])
+			offset += r.blockSize - blockHeaderSize
+		}
+		index = r.readNextBlockIndex(index)
+	}
+	return val
 }
 
 func (r *ringBuffer) readKey(index uint32) string {
-
+	keyLength := int(r.readKeyLength(index))
+	keyBuf := make([]byte, keyLength)
+	for i, offset := 0, 0; offset < keyLength; i++ {
+		if i == 0 {
+			copy(keyBuf[offset:], r.buf[int(index)*r.blockSize+blockHeaderSize+entryHeaderSize:int(index+1)*r.blockSize])
+			offset += r.blockSize - blockHeaderSize - entryHeaderSize
+		} else {
+			copy(keyBuf[offset:], r.buf[int(index)*r.blockSize+blockHeaderSize:int(index+1)*r.blockSize])
+			offset += r.blockSize - blockHeaderSize
+		}
+		index = r.readNextBlockIndex(index)
+	}
+	return bytesToString(keyBuf)
 }
 
 func (r *ringBuffer) readKeyLength(index uint32) uint16 {
@@ -71,8 +110,9 @@ func (r *ringBuffer) write(e entry) uint32 {
 		if i < len(blocks)-1 {
 			r.writeNextBlockIndex(uint32(blocks[i]), uint32(blocks[i+1]))
 		}
-		copy(r.buf[blocks[i]*r.blockSize+blockHeaderSize:], e[i*(r.blockSize-blockHeaderSize):])
+		copy(r.buf[blocks[i]*r.blockSize+blockHeaderSize:(blocks[i]+1)*r.blockSize], e[i*(r.blockSize-blockHeaderSize):])
 	}
+	return uint32(blocks[0])
 }
 
 func (r *ringBuffer) writeNextBlockIndex(index, next uint32) {
