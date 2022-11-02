@@ -175,5 +175,5 @@ func (r *ringBuffer) hasEnoughSpace(e entry) bool {
 }
 
 func (r *ringBuffer) hasEnoughBlocks(e entry) bool {
-	return r.calBlocks(e) >= len(r.freeBlocks)
+	return r.calBlocks(e) <= len(r.freeBlocks)
 }
