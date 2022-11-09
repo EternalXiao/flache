@@ -26,11 +26,11 @@ func newRingBuffer(size, blockSize int) *ringBuffer {
 }
 
 func (r *ringBuffer) readPrevEntryIndex(index uint32) uint32 {
-	return binary.LittleEndian.Uint32(r.buf[int(index)*r.blockSize+prevEntryOffset:])
+	return binary.LittleEndian.Uint32(r.buf[int(index)*r.blockSize+blockHeaderSize+prevEntryOffset:])
 }
 
 func (r *ringBuffer) readNextEntryIndex(index uint32) uint32 {
-	return binary.LittleEndian.Uint32(r.buf[int(index)*r.blockSize+nextEntryOffset:])
+	return binary.LittleEndian.Uint32(r.buf[int(index)*r.blockSize+blockHeaderSize+nextEntryOffset:])
 }
 
 func (r *ringBuffer) readVal(index uint32) []byte {
@@ -94,7 +94,7 @@ func (r *ringBuffer) readHashedKey(index uint32) uint64 {
 
 func (r *ringBuffer) readExpireAt(index uint32) time.Time {
 	expireAtTs := binary.LittleEndian.Uint64(r.buf[int(index)*r.blockSize+blockHeaderSize+expireAtOffset:])
-	return time.Unix(int64(expireAtTs), 0)
+	return time.Unix(int64(expireAtTs)/int64(time.Second), int64(expireAtTs)%int64(time.Second))
 }
 
 func (r *ringBuffer) readNextBlockIndex(index uint32) uint32 {
@@ -120,11 +120,11 @@ func (r *ringBuffer) writeNextBlockIndex(index, next uint32) {
 }
 
 func (r *ringBuffer) writeNextEntryIndex(prev, next uint32) {
-	binary.LittleEndian.PutUint32(r.buf[int(prev)*r.blockSize+nextEntryOffset:], next)
+	binary.LittleEndian.PutUint32(r.buf[int(prev)*r.blockSize+blockHeaderSize+nextEntryOffset:], next)
 }
 
 func (r *ringBuffer) writePrevEntryIndex(next, prev uint32) {
-	binary.LittleEndian.PutUint32(r.buf[int(next)*r.blockSize+prevEntryOffset:], prev)
+	binary.LittleEndian.PutUint32(r.buf[int(next)*r.blockSize+blockHeaderSize+prevEntryOffset:], prev)
 }
 
 func (r *ringBuffer) remove(index uint32) {

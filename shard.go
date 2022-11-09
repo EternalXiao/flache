@@ -46,7 +46,7 @@ func (s *shard) get(key string, hashedKey uint64) ([]byte, error) {
 
 func (s *shard) isExpire(index uint32) bool {
 	expireAt := s.ringBuf.readExpireAt(index)
-	if expireAt.IsZero() {
+	if expireAt.UnixNano() == 0 {
 		return false
 	}
 	return expireAt.Before(time.Now())
